@@ -14,24 +14,21 @@ using namespace std;
 class instructionData{
 public:
     string instr;
-    string reg1;
+    string destReg;
     string reg2;
     string reg3;
-    bool token;
     
-    instructionData(string instr_, string reg1_, string reg2_, string reg3_, bool token_) {
+    instructionData(string instr_, string destReg_, string reg2_, string reg3_) {
         instr = instr_;
-        reg1 = reg1_;
+        destReg = destReg_;
         reg2 = reg2_;
         reg3 = reg3_;
-        token = token_;
     }
     instructionData() {
         instr = "";
-        reg1 = "";
+        destReg = "";
         reg2 = "";
         reg3 = "";
-        token = false;
     }
 };
 class regAddrData{
@@ -56,11 +53,11 @@ int datamemory [16];
 int registers [16];
 vector <instructionData> instructions;
 
-instructionData INBState;
-instructionData AIBState;
-instructionData SIBState;
-instructionData PRBState;
-regAddrData ADBState;
+vector <instructionData> INBState;
+vector <instructionData> AIBState;
+vector <instructionData> SIBState;
+vector <instructionData> PRBState;
+vector<regAddrData> ADBState;
 vector<regAddrData> REBState;
 
 string printString = "";
@@ -189,7 +186,7 @@ void getInstructions() {
                     register3 += line.at(i);
                 }
             }
-            instructionData newInstruction(instr, register1, register2, register3, false);
+            instructionData newInstruction(instr, register1, register2, register3);
             instructions.push_back(newInstruction);
 
         }
@@ -198,33 +195,41 @@ void getInstructions() {
 void printState(int step) {
     printString += "STEP " + to_string(step) + ":\n";
     printString += "INM:";
-    bool addedInstr = false;
     for (int i = 0; i < instructions.size(); i++) {
-        printString +="<" + instructions.at(i).instr + "," + instructions.at(i).reg1 + "," + instructions.at(i).reg2 + "," + instructions.at(i).reg3 + ">,";
-        addedInstr = true;
+        printString +="<" + instructions.at(i).instr + "," + instructions.at(i).destReg + "," + instructions.at(i).reg2 + "," + instructions.at(i).reg3 + ">,";
     }
-    if (addedInstr){ printString.pop_back(); }
+    if (!instructions.empty()){ printString.pop_back(); }
 
     printString += "\nINB:";
-    if (INBState.token){
-        printString += "<"+INBState.instr + ","+INBState.reg1+","+INBState.reg2+","+INBState.reg3+">";
+    for (int i = 0; i < INBState.size(); i++) {
+        printString +="<" + INBState.at(i).instr + "," + INBState.at(i).destReg + "," + INBState.at(i).reg2 + "," + INBState.at(i).reg3 + ">,";
     }
+    if (!INBState.empty()){ printString.pop_back(); }
+    
     printString += "\nAIB:";
-    if (AIBState.token){
-        printString +="<"+AIBState.instr+","+AIBState.reg1+","+AIBState.reg2+","+AIBState.reg3+">";
+    for (int i = 0; i < AIBState.size(); i++) {
+        printString +="<" + AIBState.at(i).instr + "," + AIBState.at(i).destReg + "," + AIBState.at(i).reg2 + "," + AIBState.at(i).reg3 + ">,";
     }
+    if (!AIBState.empty()){ printString.pop_back(); }
+    
     printString += "\nSIB:";
-    if (SIBState.token){
-        printString +="<"+SIBState.instr+","+SIBState.reg1+","+SIBState.reg2+","+SIBState.reg3+">";
+    for (int i = 0; i < SIBState.size(); i++) {
+        printString +="<" + SIBState.at(i).instr + "," + SIBState.at(i).destReg + "," + SIBState.at(i).reg2 + "," + SIBState.at(i).reg3 + ">,";
     }
+    if (!SIBState.empty()){ printString.pop_back(); }
+    
     printString += "\nPRB:";
-    if (PRBState.token){
-        printString +="<"+PRBState.instr+","+PRBState.reg1+","+PRBState.reg2+","+PRBState.reg3+">";
+    for (int i = 0; i < PRBState.size(); i++) {
+        printString +="<" + PRBState.at(i).instr + "," + PRBState.at(i).destReg + "," + PRBState.at(i).reg2 + "," + PRBState.at(i).reg3 + ">,";
     }
+    if (!PRBState.empty()){ printString.pop_back(); }
+        
    printString += "\nADB:";
-    if (ADBState.token){
-        printString +="<"+ADBState.regName+","+ADBState.value+">";
+    for (int i = 0; i < ADBState.size(); i++) {
+        printString +="<"+ADBState.at(i).regName+","+ADBState.at(i).value+">,";
     }
+    if (!ADBState.empty()){ printString.pop_back(); } //remove last ','
+        
     printString += "\nREB:";
     for (int i = 0; i < REBState.size(); i++) {
         printString +="<"+REBState.at(i).regName+","+REBState.at(i).value+">,";
@@ -256,6 +261,7 @@ int getValueFromRegister(string registerNum) {
     int registerInt = registers[stoi(regNum)];
     return registerInt;
 }
+
 int main(int argc, const char * argv[]) {
     //initilize all of the empty register and data memory to be -1
     for (int i = 0; i<16; i++){
@@ -271,20 +277,22 @@ int main(int argc, const char * argv[]) {
     
     while (true) {
         bool stillGoing = false; //keeps track if something is stil chaning
-        if (ADBState.token){
+        if (!ADBState.empty()){
             //STORE:
             //gets the value stored in the register
-            datamemory[stoi(ADBState.value)] = getValueFromRegister(ADBState.regName);
-            ADBState.token = false;
+            regAddrData curItem = ADBState.front();
+            datamemory[stoi(curItem.value)] = getValueFromRegister(curItem.regName);
+            ADBState.erase(ADBState.begin());
             stillGoing = true;
         }
-        if (SIBState.token) { //if there is a token in SIB...
+        if (!SIBState.empty()) { //if there is a token in SIB...
             //Address Calculation:
             //the format will be <opcode, dest register, source value1, source value2>
-        
-            int destAddress = stoi(SIBState.reg2) + stoi(SIBState.reg3); //value in Register + offset
-            ADBState = regAddrData(SIBState.reg1, to_string(destAddress), true);
-            SIBState.token = false;
+            instructionData curItem = SIBState.front();
+            int destAddress = stoi(curItem.reg2) + stoi(curItem.reg3); //value in Register + offset
+            ADBState.push_back(regAddrData(curItem.destReg, to_string(destAddress), true));
+            //ADBState = regAddrData(curItem.destReg, to_string(destAddress), true);
+            SIBState.erase(SIBState.begin()); //remove front item
             stillGoing = true;
         }
         if (!REBState.empty()){ //there is a token!
@@ -298,43 +306,48 @@ int main(int argc, const char * argv[]) {
             REBState.erase(REBState.begin()); //removes token
             stillGoing = true;
         }
-        if (PRBState.token){
-            int val1 = stoi(PRBState.reg2);
-            int val2 = stoi(PRBState.reg3);
-            REBState.push_back(regAddrData(PRBState.reg1, to_string(val1 * val2), true));
-            PRBState.token = false;
+        if (!PRBState.empty()){
+            //MULT2
+            instructionData curItem = PRBState.front();
+
+            int val1 = stoi(curItem.reg2);
+            int val2 = stoi(curItem.reg3);
+            REBState.push_back(regAddrData(curItem.destReg, to_string(val1 * val2), true));
+            PRBState.erase(PRBState.begin()); //removes token
             stillGoing = true;
         }
-        if (AIBState.token){ //sees if there is a token for AIB
-            //Add - Subtract Unit (ASU)
-            if (AIBState.instr == "ADD" || AIBState.instr == "SUB") {
-                int val1 = stoi(AIBState.reg2);
-                int val2 = stoi(AIBState.reg3);
-                if (AIBState.instr == "ADD") {
-                    REBState.push_back(regAddrData(AIBState.reg1, to_string(val1 + val2), true));
+        if (!AIBState.empty()){ //sees if there is a token for AIB
+            instructionData curItem = AIBState.front();
+
+            if (curItem.instr == "ADD" || curItem.instr == "SUB") {
+                //Add - Subtract Unit (ASU)
+                int val1 = stoi(curItem.reg2);
+                int val2 = stoi(curItem.reg3);
+                if (curItem.instr == "ADD") { //ADD
+                    REBState.push_back(regAddrData(curItem.destReg, to_string(val1 + val2), true));
                 }
-                else {
-                    REBState.push_back(regAddrData(AIBState.reg1, to_string(val1 - val2), true));
+                else { //SUB
+                    REBState.push_back(regAddrData(curItem.destReg, to_string(val1 - val2), true));
                 }
-                AIBState.token = false;
             }
-            // Multiply Unit – Stage 1 (MLU1)
             else {
-                PRBState = instructionData(AIBState.instr, AIBState.reg1, AIBState.reg2, AIBState.reg3, true);
-                AIBState.token = false; //takes away AIB token
+                // Multiply Unit – Stage 1 (MLU1)
+                PRBState.push_back(instructionData(curItem.instr, curItem.destReg, curItem.reg2, curItem.reg3));
             }
+            AIBState.erase(AIBState.begin()); //removes token
             stillGoing = true;
         }
-        if (INBState.token) { //sees if the token for INB state is true
-            if (INBState.instr == "ST") {
+        if (!INBState.empty()) { //sees if the token for INB state is true
+            instructionData curItem = INBState.front();
+            if (curItem.instr == "ST") {
                 //ISSUE2:
-                SIBState = instructionData(INBState.instr, INBState.reg1, INBState.reg2, INBState.reg3, true);
+                SIBState.push_back(instructionData(curItem.instr, curItem.destReg, curItem.reg2, curItem.reg3));
             }
             else {
                 //ISSUE1:
-                AIBState = instructionData(INBState.instr, INBState.reg1, INBState.reg2, INBState.reg3, true);
+                AIBState.push_back(instructionData(curItem.instr, curItem.destReg, curItem.reg2, curItem.reg3));
             }
-            INBState.token = false; //remove item from the INB State
+            INBState.erase(INBState.begin()); //removes token
             stillGoing = true;
         }
         if (!instructions.empty()) { //sees if there is any instructions left
@@ -350,7 +363,7 @@ int main(int argc, const char * argv[]) {
                 reg3Val = to_string(getValueFromRegister(newInstr.reg3));
             }
             
-            INBState = instructionData(newInstr.instr, newInstr.reg1, reg2Val, reg3Val, true);
+            INBState.push_back(instructionData(newInstr.instr, newInstr.destReg, reg2Val, reg3Val));
             
             instructions.erase(instructions.begin()); //remove front item
             stillGoing = true;
