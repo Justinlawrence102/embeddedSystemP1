@@ -69,7 +69,9 @@ string printString = "";
 
 void getregisters() {
     ifstream inFile;
-        inFile.open("/Users/JustinLawrence/Documents/Embedded_Systems/Project1/Project1/registers.txt");
+        //inFile.open("/Users/JustinLawrence/Documents/Embedded_Systems/Project1/Project1/registers.txt");
+        inFile.open("registers.txt");
+
         if (!inFile) {
             cerr << "Unable to open file registers.txt";
             exit(1);   // call system to stop
@@ -101,7 +103,9 @@ void getregisters() {
 
 void getdateMemory() {
     ifstream inFile;
-        inFile.open("/Users/JustinLawrence/Documents/Embedded_Systems/Project1/Project1/datamemory.txt");
+        //inFile.open("/Users/JustinLawrence/Documents/Embedded_Systems/Project1/Project1/datamemory.txt");
+        inFile.open("datamemory.txt");
+
         if (!inFile) {
             cerr << "Unable to open file registers.txt";
             exit(1);   // call system to stop
@@ -133,7 +137,9 @@ void getdateMemory() {
 }
 void getInstructions() {
     ifstream inFile;
-        inFile.open("/Users/JustinLawrence/Documents/Embedded_Systems/Project1/Project1/instructions.txt");
+        //inFile.open("/Users/JustinLawrence/Documents/Embedded_Systems/Project1/Project1/instructions.txt");
+        inFile.open("instructions.txt");
+
         if (!inFile) {
             cerr << "Unable to open file registers.txt";
             exit(1);   // call system to stop
@@ -192,12 +198,15 @@ void getInstructions() {
         inFile.close();
 }
 void printState(int step) {
-    printString += "\nSTEP: " + to_string(step) + ":\n";
+    printString += "STEP " + to_string(step) + ":\n";
     printString += "INM:";
+    bool addedInstr = false;
     for (int i = curInstr; i < numInstr; i++) {
-        printString +="<" + instructions[i].instr + "," + instructions[i].reg1 + "," + instructions[i].reg2 + "," + instructions[i].reg3 + ">";
-        if (i > numInstr) { printString += ","; }
+        printString +="<" + instructions[i].instr + "," + instructions[i].reg1 + "," + instructions[i].reg2 + "," + instructions[i].reg3 + ">,";
+        addedInstr = true;
     }
+    if (addedInstr){ printString.pop_back(); }
+
     printString += "\nINB:";
     if (INBState.token){
         printString += "<"+INBState.instr + ","+INBState.reg1+","+INBState.reg2+","+INBState.reg3+">";
@@ -220,25 +229,26 @@ void printState(int step) {
     }
     printString += "\nREB:";
     for (int i = 0; i < REBState.size(); i++) {
-        printString +="<"+REBState.at(i).regName+","+REBState.at(i).value+">";
+        printString +="<"+REBState.at(i).regName+","+REBState.at(i).value+">,";
     }
-    
+    if (!REBState.empty()){ printString.pop_back(); } //remove last ','
+
     printString += "\nRGF:";
     for (int i = 0; i < 16; i++) {
-        if (registers[i] != 0) {
-            printString += "<R" + to_string(i) + "," +to_string(registers[i])+">";
+        if (registers[i] != -1) {
+            printString += "<R" + to_string(i) + "," +to_string(registers[i])+">,";
         }
-        if (i > 16) { printString += ","; }
-
     }
+    printString.pop_back();//remove last ','
+    
     printString +="\nDAM:";
       for (int i = 0; i < 16; i++) {
-          if (datamemory[i] != 0) {
+          if (datamemory[i] != -1) {
               printString += "<" + to_string(i) +","+to_string(datamemory[i])+">,";
           }
-          if (i > 16) { printString += ","; }
       }
-    printString += "\n";
+    printString.pop_back(); //remove last ','
+    printString += "\n\n";
 }
 int getValueFromRegister(string registerNum) {
     string regNum = "";
@@ -249,19 +259,26 @@ int getValueFromRegister(string registerNum) {
     return registerInt;
 }
 int main(int argc, const char * argv[]) {
-    
+    //initilize all of the empty register and data memory to be -1
+    for (int i = 0; i<16; i++){
+        datamemory[i] = -1;
+        registers[i] = -1;
+    }
     getregisters();
     getdateMemory();
     getInstructions();
+    
     int stepCounter = 1;
     printState(0);
     
     while (true) {
+        bool stillGoing = false; //keeps track if something is stil chaning
         if (ADBState.token){
             //STORE:
             //gets the value stored in the register
             datamemory[stoi(ADBState.value)] = getValueFromRegister(ADBState.regName);
             ADBState.token = false;
+            stillGoing = true;
         }
         if (SIBState.token) { //if there is a token in SIB...
             //Address Calculation:
@@ -270,6 +287,7 @@ int main(int argc, const char * argv[]) {
             int destAddress = stoi(SIBState.reg2) + stoi(SIBState.reg3); //value in Register + offset
             ADBState = regAddrData(SIBState.reg1, to_string(destAddress), true);
             SIBState.token = false;
+            stillGoing = true;
         }
         if (!REBState.empty()){ //there is a token!
             //WRITE to register file:
@@ -280,12 +298,14 @@ int main(int argc, const char * argv[]) {
             }
             registers[stoi(regNum)] = stoi(curItem.value);
             REBState.erase(REBState.begin()); //removes token
+            stillGoing = true;
         }
         if (PRBState.token){
             int val1 = stoi(PRBState.reg2);
             int val2 = stoi(PRBState.reg3);
             REBState.push_back(regAddrData(PRBState.reg1, to_string(val1 * val2), true));
             PRBState.token = false;
+            stillGoing = true;
         }
         if (AIBState.token){ //sees if there is a token for AIB
             //Add - Subtract Unit (ASU)
@@ -305,6 +325,7 @@ int main(int argc, const char * argv[]) {
                 PRBState = instructionData(AIBState.instr, AIBState.reg1, AIBState.reg2, AIBState.reg3, true);
                 AIBState.token = false; //takes away AIB token
             }
+            stillGoing = true;
         }
         if (INBState.token) { //sees if the token for INB state is true
             if (INBState.instr == "ST") {
@@ -316,6 +337,7 @@ int main(int argc, const char * argv[]) {
                 AIBState = instructionData(INBState.instr, INBState.reg1, INBState.reg2, INBState.reg3, true);
             }
             INBState.token = false; //remove item from the INB State
+            stillGoing = true;
         }
         if (curInstr < numInstr) { //sees if there is any instructions left
             //DECODE:
@@ -332,15 +354,20 @@ int main(int argc, const char * argv[]) {
             
             INBState = instructionData(newInstr.instr, newInstr.reg1, reg2Val, reg3Val, true);
             curInstr += 1;
+            stillGoing = true;
+        }
+        if (!stillGoing) {
+            printString.pop_back();
+            printString.pop_back(); //removes new line at the end
+            
+            ofstream out("simulation.txt");
+            out << printString;
+            out.close();
+            //cout << printString;
+            break;
         }
         printState(stepCounter);
         stepCounter += 1;
-        if (stepCounter > 16) {
-            ofstream out("output.txt");
-            out << printString;
-            out.close();
-            break;
-        }
     }
     
     return 0;
