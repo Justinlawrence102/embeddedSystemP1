@@ -54,9 +54,8 @@ public:
 
 int datamemory [16];
 int registers [16];
-instructionData instructions [16];
-int numInstr = 0;
-int curInstr = 0;
+vector <instructionData> instructions;
+
 instructionData INBState;
 instructionData AIBState;
 instructionData SIBState;
@@ -191,8 +190,7 @@ void getInstructions() {
                 }
             }
             instructionData newInstruction(instr, register1, register2, register3, false);
-            instructions[numInstr] = newInstruction;
-            numInstr += 1;
+            instructions.push_back(newInstruction);
 
         }
         inFile.close();
@@ -201,8 +199,8 @@ void printState(int step) {
     printString += "STEP " + to_string(step) + ":\n";
     printString += "INM:";
     bool addedInstr = false;
-    for (int i = curInstr; i < numInstr; i++) {
-        printString +="<" + instructions[i].instr + "," + instructions[i].reg1 + "," + instructions[i].reg2 + "," + instructions[i].reg3 + ">,";
+    for (int i = 0; i < instructions.size(); i++) {
+        printString +="<" + instructions.at(i).instr + "," + instructions.at(i).reg1 + "," + instructions.at(i).reg2 + "," + instructions.at(i).reg3 + ">,";
         addedInstr = true;
     }
     if (addedInstr){ printString.pop_back(); }
@@ -339,9 +337,9 @@ int main(int argc, const char * argv[]) {
             INBState.token = false; //remove item from the INB State
             stillGoing = true;
         }
-        if (curInstr < numInstr) { //sees if there is any instructions left
+        if (!instructions.empty()) { //sees if there is any instructions left
             //DECODE:
-            instructionData newInstr = instructions[curInstr];
+            instructionData newInstr = instructions.front();
             
             string reg3Val = newInstr.reg3;
             
@@ -353,7 +351,8 @@ int main(int argc, const char * argv[]) {
             }
             
             INBState = instructionData(newInstr.instr, newInstr.reg1, reg2Val, reg3Val, true);
-            curInstr += 1;
+            
+            instructions.erase(instructions.begin()); //remove front item
             stillGoing = true;
         }
         if (!stillGoing) {
